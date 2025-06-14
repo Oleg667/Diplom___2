@@ -2,11 +2,17 @@ import config.Config;
 import io.qameta.allure.*;
 import io.restassured.response.Response;
 import static org.junit.Assert.*;
+
+import org.junit.After;
 import org.junit.Test;// импортируем Test
 import static steps.UserSteps.*;  // или import steps.CounterSteps;
 import io.qameta.allure.junit4.DisplayName; // импорт DisplayName
 import org.junit.FixMethodOrder; //упорядочивние тестов в аллюр
 import org.junit.runners.MethodSorters;
+import steps.UserSteps;
+
+import java.util.HashMap;
+import java.util.Map;
 
 
 @Epic("API пользователя")
@@ -14,7 +20,7 @@ import org.junit.runners.MethodSorters;
 
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class UserTest {
-
+    private String rawAccessToken;
     @Test
     @DisplayName("#1 - Создание уникального пользователя с полными данными")
     @Description("Регистрация под созданным пользователем с полными данными")
@@ -44,9 +50,8 @@ public class UserTest {
         int statusCode = loggedResponse.getStatusCode();
         String responseBody = loggedResponse.getBody().asString();
         // Извлекаем токен
-        String rawAccessToken = loggedResponse.jsonPath().getString("accessToken");
+        rawAccessToken = loggedResponse.jsonPath().getString("accessToken");
 
-        try {
             // Проверяем, что тело ответа не пустое
             assertFalse("Тело ответа пустое", responseBody.isEmpty());
 
@@ -68,10 +73,6 @@ public class UserTest {
                     Config.STATUS_CODE_OK,
                     statusCode);
 
-        } finally {
-            // Удаляем созданного пользователя
-            cleanUp(rawAccessToken);
-        }
     }
 
 
@@ -79,10 +80,11 @@ public class UserTest {
     @DisplayName("#2 - Авторизация пользователя без логина → 401")
     @Description("Проверка, что API возвращает статус 401, Ответ: \"email or password are incorrect\" ")
     public void test2_loggedUserWithoutLogin_ShouldReturn401() {
-        String json = "{"
-                + "\"password\": \"" + Config.DEFAULT_PASSWORD + "\""
-                + "}";
-        Response response = userLoggedPartial(json);
+
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("login", Config.DEFAULT_USER_LOGIN_PREFIX);
+
+        Response response = userLoggedPartial(requestBody);
         assertFalse("success должен быть false", response.jsonPath().getBoolean("success"));
         assertEquals(
                 "Ожидается статус 401 (Bad Request)",
@@ -97,11 +99,11 @@ public class UserTest {
     @DisplayName("#3 - Авторизация пользователя без пароля → 401")
     @Description("Проверка, что API возвращает статус 401, Ответ: \"email or password are incorrect\" ")
     public void test3_loggedUserWithoutPassword_ShouldReturn401() {
-        String json = "{"
-                + "\"login\": \"" + Config.DEFAULT_USER_LOGIN_PREFIX + "\""
-                + "}";
 
-        Response response = userLoggedPartial(json);
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("login", Config.DEFAULT_USER_LOGIN_PREFIX);
+
+        Response response = userLoggedPartial(requestBody);
         assertFalse("success должен быть false", response.jsonPath().getBoolean("success"));
         assertEquals(
                 "Ожидается статус 400 (Bad Reqest)",
@@ -127,10 +129,10 @@ public class UserTest {
         Response createResponse = createUser(uniqueName, email, Config.DEFAULT_PASSWORD);
 
         // Извлекаем токен
-        String rawAccessToken = createResponse.jsonPath().getString("accessToken");
+        rawAccessToken = createResponse.jsonPath().getString("accessToken");
         // Отправляем повторно запрос на создание
         Response createResponseRet = createUser(uniqueName, email, Config.DEFAULT_PASSWORD);
-        try {
+
             // Проверка тела ответа
             assertFalse("Тело ответа пустое", createResponseRet.getBody().asString().isEmpty());
             assertFalse("success должен быть false", createResponseRet.jsonPath().getBoolean("success"));
@@ -140,10 +142,7 @@ public class UserTest {
             assertEquals("Статус код должен быть 403",
                     Config.STATUS_CODE_FORBIDDEN,
                     createResponseRet.getStatusCode());
-        } finally {
-            // Удаляем созданного пользователя
-            cleanUp(rawAccessToken);
-        }
+
     }
 
     @Test
@@ -153,7 +152,7 @@ public class UserTest {
 
         String login = generateUniqueLogin(); // Генерация уникального логина
         Response loggedResponse = userLogged(login, Config.DEFAULT_PASSWORD); // Отправляем запрос на авторизацию
-        try {
+
             // Проверка тела ответа
             assertFalse("Тело ответа пустое", loggedResponse.getBody().asString().isEmpty());
             assertFalse("success должен быть false", loggedResponse.jsonPath().getBoolean("success"));
@@ -163,9 +162,7 @@ public class UserTest {
             assertEquals("Статус код должен быть 401 (Not Found)",
                     Config.STATUS_CODE_UNAUTHORIZED,
                     loggedResponse.getStatusCode());
-        } finally {
-            // Очистка, если нужно
-        }
+
     }
     @Test
     @DisplayName("#6 - Авторизация пользователя с неверным паролем")
@@ -182,24 +179,32 @@ public class UserTest {
         Response createResponse = createUser(uniqueName, email, Config.DEFAULT_PASSWORD);
 
         // Извлекаем токен
-        String rawAccessToken = createResponse.jsonPath().getString("accessToken");
+        rawAccessToken = createResponse.jsonPath().getString("accessToken");
         // Отправляем запрос на авторизацию
-        Response loggedResponse = userLogged(email, Config.DEFAULT_PASSWORD+"xxx");
+        Response loggedResponse = userLogged(email, Config.DEFAULT_PASSWORD + "xxx");
 
-        try {
-            assertFalse("success должен быть false", loggedResponse.jsonPath().getBoolean("success"));
-            // Проверка тела ответа
-            assertFalse("Тело ответа пустое", loggedResponse.getBody().asString().isEmpty());
-            // Проверяем текст ответа
-            assertEquals("email or password are incorrect", loggedResponse.jsonPath().getString("message"));
-            // Ожидаем статус кода 401 (Not Found)
-            assertEquals("Статус код должен быть 401",
-                    Config.STATUS_CODE_UNAUTHORIZED,
-                    loggedResponse.getStatusCode());
-        } finally {
-            // Удаляем созданного пользователя
-            cleanUp(rawAccessToken);
-        }
+
+        assertFalse("success должен быть false", loggedResponse.jsonPath().getBoolean("success"));
+        // Проверка тела ответа
+        assertFalse("Тело ответа пустое", loggedResponse.getBody().asString().isEmpty());
+        // Проверяем текст ответа
+        assertEquals("email or password are incorrect", loggedResponse.jsonPath().getString("message"));
+        // Ожидаем статус кода 401 (Not Found)
+        assertEquals("Статус код должен быть 401",
+                Config.STATUS_CODE_UNAUTHORIZED,
+                loggedResponse.getStatusCode());
     }
+
+    @After
+    public void cleanUp() {
+        if (rawAccessToken != null) {
+            UserSteps.cleanUp(rawAccessToken);
+            rawAccessToken = null;
+        }
+
+    }
+
+
+
 
 }

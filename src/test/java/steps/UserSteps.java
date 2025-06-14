@@ -8,6 +8,7 @@ import io.restassured.config.HttpClientConfig;
 import io.restassured.http.ContentType;
 import config.Config;
 
+import java.util.Map;
 
 
 public class UserSteps {
@@ -72,10 +73,10 @@ public class UserSteps {
     }
     @Step("авторизация пользователя с неполными данными {jsonRequestBody}")
     // Метод для тестирования неполных данных при авторизации курьера
-    public static Response userLoggedPartial(String jsonRequestBody) {
+    public static Response userLoggedPartial(Map<String, Object> requestBody) {
         return given()
                 .contentType(ContentType.JSON)
-                .body(jsonRequestBody)
+                .body(requestBody)
                 .post(Config.USER_LOGIN_API);
     }
 

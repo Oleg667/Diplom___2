@@ -3,12 +3,15 @@ import config.Config;
 import io.qameta.allure.*;
 import io.restassured.response.Response;
 import static org.junit.Assert.*;
+
+import org.junit.After;
 import org.junit.Test;// импортируем Test
 import static steps.UserSteps.*;  // или import steps.CounterSteps;
 import static steps.OrderSteps.*;
 import io.qameta.allure.junit4.DisplayName; // импорт DisplayName
 import org.junit.FixMethodOrder; //упорядочивние тестов в аллюр
 import org.junit.runners.MethodSorters;
+import steps.UserSteps;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -23,6 +26,7 @@ import java.util.Map;
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 
 public class OrderTest {
+    private String rawAccessToken;
 
 @Test
 @DisplayName("#1 - Создание заказа без авторизации")
@@ -55,14 +59,14 @@ public void test_CreateOrder_WithoutAuthorization() {
     @Test
     @DisplayName("#2 - Создание заказа с авторизации")
     @Description("Только ингредиенты ")
-    public void test_CreateOrder_Authorization() {
+    public void testCreateOrderAuthorization() {
         int ingredientsCount = 4; //количество ингредиентов
         // создание пользователя
         String uniqueName = generateUniqueLogin();
         String email = uniqueName + "@mail.ru";
         createUser(uniqueName, email, Config.DEFAULT_PASSWORD);
         Response loggedResponse = userLogged(email, Config.DEFAULT_PASSWORD);
-        String rawAccessToken = loggedResponse.jsonPath().getString("accessToken");
+        rawAccessToken = loggedResponse.jsonPath().getString("accessToken");
 
         // Шаг 1: Получаем все ингредиенты
         Response ingredientsResponse = getAllIngredients();
@@ -72,7 +76,7 @@ public void test_CreateOrder_WithoutAuthorization() {
 
         // Шаг 3: Создаём заказ c авторизацией
         Response orderResponse = createOrderAuthor(requestBody,rawAccessToken);
-        try {
+       // try {
         // Проверки
         assertEquals("Ожидался статус 200 OK", Config.STATUS_CODE_OK, orderResponse.getStatusCode());
         assertTrue("Ожидалось, что success=true", orderResponse.jsonPath().getBoolean("success"));
@@ -90,10 +94,10 @@ public void test_CreateOrder_WithoutAuthorization() {
         assertNotNull("Поле 'owner' должно быть", owner);
         assertEquals("Имя владельца не совпадает", uniqueName, owner.get("name"));
         assertEquals("Email владельца не совпадает", email, owner.get("email"));
-        } finally {
-            // Удаляем созданного пользователя
-            cleanUp(rawAccessToken);
-        }
+//        } finally {
+//            // Удаляем созданного пользователя
+//            cleanUp(rawAccessToken);
+//        }
 
     }
 
@@ -174,7 +178,7 @@ public void test_CreateOrder_WithoutAuthorization() {
         String email = uniqueName + "@mail.ru";
         createUser(uniqueName, email, Config.DEFAULT_PASSWORD);
         Response loggedResponse = userLogged(email, Config.DEFAULT_PASSWORD);
-        String rawAccessToken = loggedResponse.jsonPath().getString("accessToken");
+        rawAccessToken = loggedResponse.jsonPath().getString("accessToken");
 
         // Получаем все ингредиенты
         Response ingredientsResponse = getAllIngredients();
@@ -188,21 +192,21 @@ public void test_CreateOrder_WithoutAuthorization() {
             createOrderAuthor(requestBody, rawAccessToken);
         }
 
-        Response orderResponse = OrderUser(rawAccessToken);
+        Response orderResponse = orderUser(rawAccessToken);
 
-        try {
-            // Проверки
+             // Проверки
             assertEquals("Ожидался статус 200 OK", Config.STATUS_CODE_OK, orderResponse.getStatusCode());
             assertTrue("Ожидалось, что success=true", orderResponse.jsonPath().getBoolean("success"));
             // Проверяем что количество заказов равно количеству созданных
             List<?> orders = orderResponse.jsonPath().getList("orders");
             assertEquals("Количество заказов должно быть равно " + end, end, orders.size());
 
-        } finally {
-            // Удаляем созданного пользователя
-            cleanUp(rawAccessToken);
-        }
-
     }
-
+    @After
+    public void cleanUp() {
+        if (rawAccessToken != null) {
+            UserSteps.cleanUp(rawAccessToken);
+            rawAccessToken = null;
+        }
+    }
 }

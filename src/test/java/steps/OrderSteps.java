@@ -76,7 +76,7 @@ public class OrderSteps {
                 .response();
     }
     @Step("Список заказов пользователя")
-    public static Response OrderUser(String accessToken) {
+    public static Response orderUser(String accessToken) {
         return given()
                 .header("Authorization", accessToken)
                 .when()
